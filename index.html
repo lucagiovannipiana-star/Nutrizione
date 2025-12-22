@@ -33,9 +33,19 @@ tfoot th{background:#f1f5f9}
 </style>
 </head>
 <body>
+
 <div class="container">
 
-<h1>🥗 Diario Alimentare</h1>
+<!-- LOGIN -->
+<div class="card controls" id="loginCard">
+  <input type="text" id="username" placeholder="Inserisci il tuo nome">
+  <button class="primary" onclick="login()">Login</button>
+</div>
+
+<!-- APP PRINCIPALE -->
+<div id="mainApp" style="display:none;">
+
+<h1>🥗 Diario Alimentare - <span id="userLabel"></span></h1>
 
 <!-- Controlli -->
 <div class="card controls">
@@ -87,9 +97,10 @@ tfoot th{background:#f1f5f9}
 </div>
 
 </div>
+</div>
 
 <script>
-const API = "https://script.google.com/macros/s/AKfycbzALgO_J8C7jzwc1mT9YRgolmlgohRYi9UVe272oqs8GMFil0AgpS0OUflqO524EMNqiQ/exec";
+const API = "https://script.google.com/macros/s/AKfycbySyA14bmgDUIwsg3no2p3Y6cEhQFrTWIkW1UUVcfX_bPklcZDH4CQ8mTu-hss4n6gFqw/exec";
 const MEALS = [
   ["Colazione","colazione"],
   ["Spuntino mattina","spuntino-m"],
@@ -98,46 +109,48 @@ const MEALS = [
   ["Cena","cena"]
 ];
 
-let db = [];
-let allDays = [];
-let chart, macroChart;
+let db=[], allDays=[], chart, macroChart;
+let currentUser="";
 
-// --- Format YYYY-MM-DD
-function formatDate(d){
-  const yy = d.getFullYear();
-  const mm = String(d.getMonth()+1).padStart(2,'0');
-  const dd = String(d.getDate()).padStart(2,'0');
-  return `${yy}-${mm}-${dd}`;
+// --- LOGIN ---
+function login(){
+  const name = document.getElementById("username").value.trim();
+  if(!name) return alert("Inserisci il tuo nome!");
+  currentUser = name;
+  document.getElementById("userLabel").textContent = currentUser;
+  document.getElementById("loginCard").style.display = "none";
+  document.getElementById("mainApp").style.display = "block";
+  init();
+}
+
+// --- FETCH con utente ---
+async function apiFetch(action, body=null){
+  const url = `${API}?action=${action}&user=${encodeURIComponent(currentUser)}`;
+  const options = body? {method:"POST",body:JSON.stringify(body)}:{};
+  const res = await fetch(url, options);
+  return await res.json();
 }
 
 // --- INIT ---
-const giornoInput = document.getElementById("giorno");
-giornoInput.value = formatDate(new Date());
-
-fetch(API + "?action=getDB")
-  .then(r=>r.json())
-  .then(d=>{ db = d; });
-
-renderMeals();
-report();
+async function init(){
+  db = await apiFetch("getDB");
+  renderMeals();
+  report();
+}
 
 // --- Render pasti ---
 function renderMeals(){
-  const m = document.getElementById("meals");
-  m.innerHTML = "";
+  const m=document.getElementById("meals");
+  m.innerHTML="";
   MEALS.forEach(([n,c])=>{
-    m.innerHTML += `
+    m.innerHTML+=`
     <div class="card">
       <div class="meal-title ${c}">
         <span>${n}</span>
         <button type="button" onclick="addRow('${n}')">+</button>
       </div>
       <table>
-        <thead>
-          <tr>
-            <th>Alimento</th><th>g</th><th>Kcal</th><th>Carb</th><th>Prot</th><th>Fat</th><th></th>
-          </tr>
-        </thead>
+        <thead><tr><th>Alimento</th><th>g</th><th>Kcal</th><th>Carb</th><th>Prot</th><th>Fat</th><th></th></tr></thead>
         <tbody id="${n}-b"></tbody>
         <tfoot>
           <tr>
@@ -157,9 +170,9 @@ function renderMeals(){
 
 // --- Aggiungi riga ---
 function addRow(m,a={},q=100){
-  const b = document.getElementById(m+"-b");
-  const r = document.createElement("tr");
-  r.innerHTML = `
+  const b=document.getElementById(m+"-b");
+  const r=document.createElement("tr");
+  r.innerHTML=`
 <td style="position:relative">
   <input value="${a.alimento||""}" oninput="auto(this)">
   <div class="autocomplete"></div>
@@ -175,142 +188,77 @@ function addRow(m,a={},q=100){
 
 // --- Autocomplete ---
 function auto(i){
-  const box = i.nextElementSibling;
-  const v = i.value.toLowerCase();
-  box.innerHTML = "";
-  if(!v){ box.style.display="none"; return; }
-  db.filter(x=>x.alimento.toLowerCase().includes(v))
-    .slice(0,20)
-    .forEach(a=>{
-      const d=document.createElement("div");
-      d.textContent = a.alimento;
-      d.onclick = ()=>{
-        i.value=a.alimento;
-        box.style.display="none";
-        calc();
-      };
-      box.appendChild(d);
-    });
+  const box=i.nextElementSibling;
+  const v=i.value.toLowerCase();
+  box.innerHTML="";
+  if(!v){box.style.display="none";return;}
+  db.filter(x=>x.alimento.toLowerCase().includes(v)).slice(0,20).forEach(a=>{
+    const d=document.createElement("div"); d.textContent=a.alimento;
+    d.onclick=()=>{i.value=a.alimento;box.style.display="none";calc();};
+    box.appendChild(d);
+  });
   box.style.display="block";
 }
-
 document.addEventListener("click",e=>{
-  if(!e.target.closest(".autocomplete") && !e.target.closest("td")){
+  if(!e.target.closest(".autocomplete") && !e.target.closest("td"))
     document.querySelectorAll(".autocomplete").forEach(d=>d.style.display="none");
-  }
 });
 
 // --- Calcolo nutrienti ---
 function calc(){
-  let day = {c:0,cb:0,p:0,f:0};
+  let day={c:0,cb:0,p:0,f:0};
   MEALS.forEach(([n])=>{
-    let t = {c:0,cb:0,p:0,f:0};
+    let t={c:0,cb:0,p:0,f:0};
     [...document.getElementById(n+"-b").rows].forEach(r=>{
-      const a = db.find(x=>x.alimento===r.cells[0].children[0].value);
-      const q = +r.cells[1].children[0].value || 0;
+      const a=db.find(x=>x.alimento===r.cells[0].children[0].value);
+      const q=+r.cells[1].children[0].value||0;
       if(a){
-        const c  = a.calorie      * q / 100;
-        const cb = a.carboidrati  * q / 100;
-        const p  = a.proteine     * q / 100;
-        const f  = a.grassi       * q / 100;
-        r.querySelector(".c").textContent  = c.toFixed(1);
-        r.querySelector(".cb").textContent = cb.toFixed(1);
-        r.querySelector(".p").textContent  = p.toFixed(1);
-        r.querySelector(".f").textContent  = f.toFixed(1);
-        t.c  += c;
-        t.cb += cb;
-        t.p  += p;
-        t.f  += f;
-      }else{
-        r.querySelector(".c").textContent  = "0";
-        r.querySelector(".cb").textContent = "0";
-        r.querySelector(".p").textContent  = "0";
-        r.querySelector(".f").textContent  = "0";
+        const c=a.calorie*q/100, cb=a.carboidrati*q/100, p=a.proteine*q/100, f=a.grassi*q/100;
+        r.querySelector(".c").textContent=c.toFixed(1);
+        r.querySelector(".cb").textContent=cb.toFixed(1);
+        r.querySelector(".p").textContent=p.toFixed(1);
+        r.querySelector(".f").textContent=f.toFixed(1);
+        t.c+=c; t.cb+=cb; t.p+=p; t.f+=f;
       }
     });
-    ["c","cb","p","f"].forEach(k=>{
-      document.getElementById(`${n}-${k}`).textContent = t[k].toFixed(1);
-    });
-    day.c  += t.c;
-    day.cb += t.cb;
-    day.p  += t.p;
-    day.f  += t.f;
+    ["c","cb","p","f"].forEach(k=>document.getElementById(`${n}-${k}`).textContent=t[k].toFixed(1));
+    day.c+=t.c; day.cb+=t.cb; day.p+=t.p; day.f+=t.f;
   });
 
-  document.getElementById("totDay").innerHTML =
-    `🔥 ${day.c.toFixed(0)} kcal · 🥖 ${day.cb.toFixed(1)} g · 💪 ${day.p.toFixed(1)} g · 🧈 ${day.f.toFixed(1)} g`;
+  document.getElementById("totDay").innerHTML=`🔥 ${day.c.toFixed(0)} kcal · 🥖 ${day.cb.toFixed(1)} g · 💪 ${day.p.toFixed(1)} g · 🧈 ${day.f.toFixed(1)} g`;
 
-  const ctx = document.getElementById("macroChart");
+  const ctx=document.getElementById("macroChart");
   if(macroChart) macroChart.destroy();
-  macroChart = new Chart(ctx,{
+  macroChart=new Chart(ctx,{
     type:"doughnut",
-    data:{
-      labels:["Carb","Prot","Fat"],
-      datasets:[{
-        data:[day.cb,day.p,day.f],
-        backgroundColor:["#38bdf8","#4ade80","#fb7185"],
-        borderColor:"#f8fafc",
-        borderWidth:2
-      }]
-    },
-    options:{
-      responsive:true,
-      maintainAspectRatio:false,
-      cutout:"65%",
-      plugins:{
-        legend:{
-          position:"bottom",
-          labels:{boxWidth:10,font:{size:10},color:"#0f172a"}
-        }
-      },
-      layout:{padding:4}
-    }
+    data:{labels:["Carb","Prot","Fat"],datasets:[{data:[day.cb,day.p,day.f],backgroundColor:["#38bdf8","#4ade80","#fb7185"],borderColor:"#f8fafc",borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:"65%",plugins:{legend:{position:"bottom",labels:{boxWidth:10,font:{size:10},color:"#0f172a"}}},layout:{padding:4}}
   });
-
   return day;
 }
 
 // --- Salvataggio ---
-function saveDay(){
-  const date = giornoInput.value;
+async function saveDay(){
+  const date=document.getElementById("giorno").value;
   if(!date) return alert("Seleziona una data");
-  const items = [];
-  MEALS.forEach(([n])=>{
-    [...document.getElementById(n+"-b").rows].forEach(r=>{
-      const a = r.cells[0].children[0].value;
-      const q = +r.cells[1].children[0].value || 0;
-      const f = db.find(x=>x.alimento===a);
-      if(a && q && f){
-        items.push({
-          pasto:n,
-          alimento:a,
-          quantita:q,
-          nutrienti:{
-            cal:  f.calorie     * q/100,
-            carb: f.carboidrati * q/100,
-            prot: f.proteine    * q/100,
-            fat:  f.grassi      * q/100
-          }
-        });
-      }
-    });
-  });
-
-  fetch(API + "?action=saveDay",{
-    method:"POST",
-    body:JSON.stringify({date,items})
-  }).then(()=>alert("Giorno salvato"));
+  const items=[];
+  MEALS.forEach(([n])=>[...document.getElementById(n+"-b").rows].forEach(r=>{
+    const a=r.cells[0].children[0].value;
+    const q=+r.cells[1].children[0].value||0;
+    const f=db.find(x=>x.alimento===a);
+    if(a&&q&&f) items.push({pasto:n,alimento:a,quantita:q,nutrienti:{cal:f.calorie*q/100,carb:f.carboidrati*q/100,prot:f.proteine*q/100,fat:f.grassi*q/100}});
+  }));
+  await apiFetch("saveDay",{date,items});
+  alert("Giorno salvato per "+currentUser);
 }
 
 // --- Caricamento giorno ---
-function loadDay(){
-  const date = giornoInput.value;
+async function loadDay(){
+  const date=document.getElementById("giorno").value;
   if(!date) return;
-  fetch(API + "?action=getDay&date=" + encodeURIComponent(date))
-    .then(r=>r.json())
-    .then(showDay);
+  const d=await apiFetch("getDay",{date});
+  showDay(d);
 }
-
 function showDay(d){
   renderMeals();
   d.forEach(i=>addRow(i.pasto,i,i.quantita));
@@ -318,170 +266,54 @@ function showDay(d){
 }
 
 // --- Report storico ---
-const chartEl = document.getElementById("chart");
-
-function report(){
-  const from = document.getElementById("from").value;
-  const to   = document.getElementById("to").value;
-  const kmin = document.getElementById("kmin").value !== "" ? +document.getElementById("kmin").value : null;
-  const kmax = document.getElementById("kmax").value !== "" ? +document.getElementById("kmax").value : null;
-
-  fetch(API + "?action=getAllDays")
-    .then(r => r.json())
-    .then(d => {
-      allDays = d || [];
-
-      const labels = [];
-      const K = [];   // Kcal
-      const CB = [];  // Carboidrati
-      const P = [];   // Proteine
-      const F = [];   // Grassi
-
-      const list = document.getElementById("reportList");
-      list.innerHTML = "";
-
-      allDays.forEach(x => {
-        const items = Array.isArray(x.items) ? x.items : [];
-
-        if (from && x.date < from) return;
-        if (to   && x.date > to)   return;
-
-        const t = items.reduce((a, i) => {
-          a.c  += +i.nutrienti.cal  || 0;
-          a.cb += +i.nutrienti.carb || 0;
-          a.p  += +i.nutrienti.prot || 0;
-          a.f  += +i.nutrienti.fat  || 0;
-          return a;
-        }, {c:0, cb:0, p:0, f:0});
-
-        if (kmin !== null && t.c < kmin) return;
-        if (kmax !== null && t.c > kmax) return;
-
-        labels.push(x.date);
-        K.push(t.c);
-        CB.push(t.cb);
-        P.push(t.p);
-        F.push(t.f);
-
-        list.innerHTML +=
-          `<span class="report-day" onclick="openDay('${x.date}')">
-             ${x.date} → ${t.c.toFixed(0)} kcal
-           </span>`;
-      });
-
-      if (chart) chart.destroy();
-
-      chart = new Chart(chartEl, {
-        type: "bar",
-        data: {
-          labels,
-          datasets: [
-            {
-              label:"Kcal",
-              data:K,
-              backgroundColor:"rgba(249,115,22,0.7)",
-              borderColor:"rgba(194,65,12,1)",
-              borderWidth:1,
-              yAxisID:"yKcal"
-            },
-            {
-              label:"Carb (g)",
-              data:CB,
-              backgroundColor:"rgba(56,189,248,0.6)",
-              borderColor:"rgba(59,130,246,1)",
-              borderWidth:1,
-              yAxisID:"yMacro"
-            },
-            {
-              label:"Prot (g)",
-              data:P,
-              backgroundColor:"rgba(34,197,94,0.6)",
-              borderColor:"rgba(22,163,74,1)",
-              borderWidth:1,
-              yAxisID:"yMacro"
-            },
-            {
-              label:"Fat (g)",
-              data:F,
-              backgroundColor:"rgba(248,113,113,0.6)",
-              borderColor:"rgba(220,38,38,1)",
-              borderWidth:1,
-              yAxisID:"yMacro"
-            }
-          ]
-        },
-        options: {
-          responsive:true,
-          maintainAspectRatio:false,
-          plugins:{
-            legend:{
-              position:"bottom",
-              labels:{color:"#0f172a"}
-            }
-          },
-          scales:{
-            x:{
-              ticks:{color:"#475569"}
-            },
-            yKcal:{
-              type:"linear",
-              position:"left",
-              ticks:{color:"#0f172a"},
-              title:{display:true,text:"Kcal",color:"#0f172a"}
-            },
-            yMacro:{
-              type:"linear",
-              position:"right",
-              grid:{drawOnChartArea:false},
-              ticks:{color:"#475569"},
-              title:{display:true,text:"g",color:"#475569"}
-            }
-          }
-        }
-      });
-    })
-    .catch(err => {
-      console.error(err);
-      alert("Errore nel caricamento del report");
-    });
+const chartEl=document.getElementById("chart");
+async function report(){
+  const from=document.getElementById("from").value;
+  const to=document.getElementById("to").value;
+  const kmin=document.getElementById("kmin").value!==""?+document.getElementById("kmin").value:null;
+  const kmax=document.getElementById("kmax").value!==""?+document.getElementById("kmax").value:null;
+  const d=await apiFetch("getAllDays");
+  allDays=d||[];
+  const labels=[],K=[],CB=[],P=[],F=[];
+  const list=document.getElementById("reportList"); list.innerHTML="";
+  allDays.forEach(x=>{
+    const items=Array.isArray(x.items)?x.items:[];
+    if(from&&x.date<from) return;
+    if(to&&x.date>to) return;
+    const t=items.reduce((a,i)=>{a.c+=i.nutrienti.cal;a.cb+=i.nutrienti.carb;a.p+=i.nutrienti.prot;a.f+=i.nutrienti.fat;return a;},{c:0,cb:0,p:0,f:0});
+    if(kmin!==null&&t.c<kmin) return;
+    if(kmax!==null&&t.c>kmax) return;
+    labels.push(x.date); K.push(t.c); CB.push(t.cb); P.push(t.p); F.push(t.f);
+    list.innerHTML+=`<span class="report-day" onclick="openDay('${x.date}')">${x.date} → ${t.c.toFixed(0)} kcal</span>`;
+  });
+  if(chart) chart.destroy();
+  chart=new Chart(chartEl,{type:"bar",data:{labels,datasets:[
+    {label:"Kcal",data:K,backgroundColor:"rgba(249,115,22,0.7)",borderColor:"rgba(194,65,12,1)",borderWidth:1,yAxisID:"yKcal"},
+    {label:"Carb (g)",data:CB,backgroundColor:"rgba(56,189,248,0.6)",borderColor:"rgba(59,130,246,1)",borderWidth:1,yAxisID:"yMacro"},
+    {label:"Prot (g)",data:P,backgroundColor:"rgba(34,197,94,0.6)",borderColor:"rgba(22,163,74,1)",borderWidth:1,yAxisID:"yMacro"},
+    {label:"Fat (g)",data:F,backgroundColor:"rgba(248,113,113,0.6)",borderColor:"rgba(220,38,38,1)",borderWidth:1,yAxisID:"yMacro"}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{color:"#0f172a"}}},scales:{x:{ticks:{color:"#475569"}},yKcal:{type:"linear",position:"left",ticks:{color:"#0f172a"},title:{display:true,text:"Kcal",color:"#0f172a"}},yMacro:{type:"linear",position:"right",grid:{drawOnChartArea:false},ticks:{color:"#475569"},title:{display:true,text:"g",color:"#475569"}}}}});
 }
-
-function openDay(d){
-  const day = allDays.find(x=>x.date===d);
-  if(!day) return;
-  giornoInput.value = d;
-  showDay(day.items);
-}
+function openDay(d){const day=allDays.find(x=>x.date===d);if(!day)return;document.getElementById("giorno").value=d;showDay(day.items);}
 
 // --- Aggiungi alimento ---
-function addFoodDB(){
-  const a  = document.getElementById("newAlimento").value.trim();
-  const c  = +document.getElementById("newCal").value;
-  const cb = +document.getElementById("newCarb").value;
-  const p  = +document.getElementById("newProt").value;
-  const f  = +document.getElementById("newFat").value;
-  if(!a || !c) return alert("Nome e Kcal obbligatori");
-
-  const newFood = {alimento:a,calorie:c,carboidrati:cb||0,proteine:p||0,grassi:f||0};
+async function addFoodDB(){
+  const a=document.getElementById("newAlimento").value.trim();
+  const c=+document.getElementById("newCal").value;
+  const cb=+document.getElementById("newCarb").value;
+  const p=+document.getElementById("newProt").value;
+  const f=+document.getElementById("newFat").value;
+  if(!a||!c) return alert("Nome e Kcal obbligatori");
+  const newFood={alimento:a,calorie:c,carboidrati:cb||0,proteine:p||0,grassi:f||0};
   db.push(newFood);
-
-  fetch(API + "?action=addFood",{
-    method:"POST",
-    body:JSON.stringify(newFood)
-  })
-    .then(r=>r.json())
-    .then(()=>{
-      alert("Alimento aggiunto");
-      document.getElementById("newAlimento").value="";
-      document.getElementById("newCal").value="";
-      document.getElementById("newCarb").value="";
-      document.getElementById("newProt").value="";
-      document.getElementById("newFat").value="";
-    });
+  await apiFetch("addFood",newFood);
+  alert("Alimento aggiunto");
+  document.getElementById("newAlimento").value="";
+  document.getElementById("newCal").value="";
+  document.getElementById("newCarb").value="";
+  document.getElementById("newProt").value="";
+  document.getElementById("newFat").value="";
 }
 </script>
 </body>
 </html>
-
-
-
