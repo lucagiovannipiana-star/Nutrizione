@@ -6,30 +6,40 @@
 <title>🥗 Diario Alimentare</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-body{font-family:Inter,system-ui;background:#f8fafc;margin:0;padding:14px;color:#0f172a}
-.container{max-width:1200px;margin:auto}
-.card{background:#fff;border-radius:18px;padding:14px;margin-bottom:14px;box-shadow:0 6px 16px rgba(0,0,0,.08)}
+body{font-family:Inter,system-ui;background:#f9fafb;margin:0;padding:14px;color:#1f2937}
+.container{max-width:1100px;margin:auto}
+.card{background:#ffffff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
 .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-input,button{padding:7px 10px;border-radius:10px;border:1px solid #94a3b8}
+input,button{padding:7px 10px;border-radius:10px;border:1px solid #cbd5e1}
 button{cursor:pointer;font-weight:600}
-.primary{background:#2563eb;color:#fff;border:none}
+.primary{background:#3b82f6;color:#fff;border:none}
+.success{color:#16a34a;font-weight:700}
+.warning{color:#dc2626;font-weight:700}
 .meal-title{font-weight:700;padding:6px;border-radius:12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
 .meal-title button{font-size:0.8rem;padding:4px 8px}
-.colazione{background:#fef3c7}.spuntino-m{background:#dcfce7}
-.pranzo{background:#dbeafe}.spuntino-p{background:#f3e8ff}.cena{background:#fee2e2}
+.colazione{background:#fefce8}
+.spuntino-m{background:#d1fae5}
+.pranzo{background:#dbeafe}
+.spuntino-p{background:#ede9fe}
+.cena{background:#fee2e2}
 table{width:100%;border-collapse:collapse;font-size:.85rem}
-th,td{padding:5px;text-align:center;border-bottom:1px solid #e5e7eb}
-thead th{background:#0f172a;color:#fff}
-tfoot th{background:#f1f5f9}
-.autocomplete{position:absolute;background:#fff;border:1px solid #2563eb;max-height:140px;overflow:auto;display:none;z-index:1000;width:100%}
+th,td{padding:6px;text-align:center;border-bottom:1px solid #e5e7eb}
+thead th{background:#1f2937;color:#fff}
+tfoot th{background:#f3f4f6}
+.autocomplete{position:absolute;background:#fff;border:1px solid #3b82f6;max-height:140px;overflow:auto;display:none;z-index:1000;width:100%}
 .autocomplete div{padding:4px 6px;cursor:pointer}
-.autocomplete div:hover{background:#2563eb;color:#fff}
-.report-day{cursor:pointer;color:#1e293b;font-weight:600;display:block;margin:4px 0;font-size:0.85rem}
+.autocomplete div:hover{background:#3b82f6;color:#fff}
+.report-day{cursor:pointer;color:#1f2937;font-weight:600;display:block;margin:2px 0;font-size:0.85rem}
 .small{font-size:.75rem;color:#475569}
 .macro-wrapper{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
 .macro-text{font-size:0.85rem}
 .macro-canvas-wrap{flex:0 0 140px;height:120px;position:relative}
 #macroChart{width:100%!important;height:100%!important}
+.modal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);display:none;justify-content:center;align-items:center;z-index:2000}
+.modal{background:#fff;padding:20px;border-radius:12px;width:320px;max-width:90%}
+.modal h3{margin-top:0;margin-bottom:10px;font-size:1.1rem}
+.modal input{width:100%;margin-bottom:6px}
+.modal button{width:100%;margin-top:6px}
 </style>
 </head>
 <body>
@@ -47,11 +57,18 @@ tfoot th{background:#f1f5f9}
 
 <h1>🥗 Diario Alimentare - <span id="userLabel"></span></h1>
 
-<!-- Controlli -->
+<!-- Aggiungi Alimento -->
+<div class="card controls">
+  <button class="primary" onclick="showModal()">➕ Aggiungi Alimento al DB</button>
+  <button class="primary" onclick="init()">🔄 Aggiorna Dati</button>
+</div>
+
+<!-- Controlli giorno -->
 <div class="card controls">
   <input type="date" id="giorno">
   <button class="primary" onclick="loadDay()">Carica</button>
   <button onclick="saveDay()">Salva</button>
+  <input type="number" id="kTarget" placeholder="Target Kcal" style="width:100px">
   <span class="small">Auto-calcolo kcal e macro</span>
 </div>
 
@@ -67,40 +84,34 @@ tfoot th{background:#f1f5f9}
       <canvas id="macroChart"></canvas>
     </div>
   </div>
+  <div class="small" id="media7gg">Media ultimi 7 giorni: — kcal</div>
 </div>
 
-<!-- Report storico -->
+<!-- Report compatto -->
 <div class="card">
-  <h3>📊 Report</h3>
-  <div class="controls">
-    Da <input type="date" id="from">
-    A <input type="date" id="to">
-    Kcal min <input type="number" id="kmin" style="width:80px">
-    max <input type="number" id="kmax" style="width:80px">
-    <button class="primary" onclick="report()">Filtra</button>
-  </div>
-  <div style="height:180px;">
-    <canvas id="chart"></canvas>
-  </div>
+  <h3>📊 Report Settimanale</h3>
+  <canvas id="chart" style="height:180px;"></canvas>
   <div id="reportList"></div>
 </div>
 
-<!-- Aggiungi alimento al DB -->
-<div class="card">
-  <h3>➕ Aggiungi alimento al DB</h3>
-  <input type="text" id="newAlimento" placeholder="Nome alimento">
-  <input type="number" step="0.1" id="newCal" placeholder="Kcal">
-  <input type="number" step="0.1" id="newCarb" placeholder="Carb">
-  <input type="number" step="0.1" id="newProt" placeholder="Prot">
-  <input type="number" step="0.1" id="newFat" placeholder="Fat">
-  <button class="primary" onclick="addFoodDB()">Aggiungi</button>
 </div>
 
-</div>
+<!-- Modal Aggiungi Alimento -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3>➕ Aggiungi Alimento</h3>
+    <input type="text" id="newAlimento" placeholder="Nome alimento">
+    <input type="number" step="0.1" id="newCal" placeholder="Kcal">
+    <input type="number" step="0.1" id="newCarb" placeholder="Carb">
+    <input type="number" step="0.1" id="newProt" placeholder="Prot">
+    <input type="number" step="0.1" id="newFat" placeholder="Fat">
+    <button class="primary" onclick="addFoodDB()">Aggiungi</button>
+    <button onclick="hideModal()">Chiudi</button>
+  </div>
 </div>
 
 <script>
-const API = "https://script.google.com/macros/s/AKfycbySyA14bmgDUIwsg3no2p3Y6cEhQFrTWIkW1UUVcfX_bPklcZDH4CQ8mTu-hss4n6gFqw/exec";
+const API = "https://script.google.com/macros/s/AKfycbzkA3zpFChpsh8n5eAu77tLiRzMNjnmgbh5e24Ugd5mRcFnbdnZ-sEHHd-0_sxC47h6ng/exec";
 const MEALS = [
   ["Colazione","colazione"],
   ["Spuntino mattina","spuntino-m"],
@@ -108,11 +119,10 @@ const MEALS = [
   ["Spuntino pomeriggio","spuntino-p"],
   ["Cena","cena"]
 ];
-
 let db=[], allDays=[], chart, macroChart;
 let currentUser="";
 
-// --- LOGIN ---
+// --- Login ---
 function login(){
   const name = document.getElementById("username").value.trim();
   if(!name) return alert("Inserisci il tuo nome!");
@@ -123,7 +133,11 @@ function login(){
   init();
 }
 
-// --- FETCH con utente ---
+// --- Modal ---
+function showModal(){document.getElementById("modalBg").style.display="flex";}
+function hideModal(){document.getElementById("modalBg").style.display="none";}
+
+// --- API ---
 async function apiFetch(action, body=null){
   const url = `${API}?action=${action}&user=${encodeURIComponent(currentUser)}`;
   const options = body? {method:"POST",body:JSON.stringify(body)}:{};
@@ -131,7 +145,7 @@ async function apiFetch(action, body=null){
   return await res.json();
 }
 
-// --- INIT ---
+// --- Init / Aggiorna ---
 async function init(){
   db = await apiFetch("getDB");
   renderMeals();
@@ -140,8 +154,7 @@ async function init(){
 
 // --- Render pasti ---
 function renderMeals(){
-  const m=document.getElementById("meals");
-  m.innerHTML="";
+  const m=document.getElementById("meals"); m.innerHTML="";
   MEALS.forEach(([n,c])=>{
     m.innerHTML+=`
     <div class="card">
@@ -172,10 +185,9 @@ function renderMeals(){
 function addRow(m,a={},q=100){
   const b=document.getElementById(m+"-b");
   const r=document.createElement("tr");
-  r.innerHTML=`
-<td style="position:relative">
-  <input value="${a.alimento||""}" oninput="auto(this)">
-  <div class="autocomplete"></div>
+  r.innerHTML=`<td style="position:relative">
+<input value="${a.alimento||''}" oninput="auto(this)">
+<div class="autocomplete"></div>
 </td>
 <td><input type="number" value="${q}" onchange="calc()"></td>
 <td class="c">0</td>
@@ -204,7 +216,7 @@ document.addEventListener("click",e=>{
     document.querySelectorAll(".autocomplete").forEach(d=>d.style.display="none");
 });
 
-// --- Calcolo nutrienti ---
+// --- Calcolo nutrienti e totale ---
 function calc(){
   let day={c:0,cb:0,p:0,f:0};
   MEALS.forEach(([n])=>{
@@ -224,20 +236,30 @@ function calc(){
     ["c","cb","p","f"].forEach(k=>document.getElementById(`${n}-${k}`).textContent=t[k].toFixed(1));
     day.c+=t.c; day.cb+=t.cb; day.p+=t.p; day.f+=t.f;
   });
-
-  document.getElementById("totDay").innerHTML=`🔥 ${day.c.toFixed(0)} kcal · 🥖 ${day.cb.toFixed(1)} g · 💪 ${day.p.toFixed(1)} g · 🧈 ${day.f.toFixed(1)} g`;
+  const kTarget = +document.getElementById("kTarget").value||0;
+  const totEl = document.getElementById("totDay");
+  totEl.innerHTML=`🔥 ${day.c.toFixed(0)} kcal · 🥖 ${day.cb.toFixed(1)} g · 💪 ${day.p.toFixed(1)} g · 🧈 ${day.f.toFixed(1)} g`;
+  totEl.className = day.c>kTarget && kTarget>0 ? "warning" : "success";
 
   const ctx=document.getElementById("macroChart");
   if(macroChart) macroChart.destroy();
   macroChart=new Chart(ctx,{
     type:"doughnut",
-    data:{labels:["Carb","Prot","Fat"],datasets:[{data:[day.cb,day.p,day.f],backgroundColor:["#38bdf8","#4ade80","#fb7185"],borderColor:"#f8fafc",borderWidth:2}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:"65%",plugins:{legend:{position:"bottom",labels:{boxWidth:10,font:{size:10},color:"#0f172a"}}},layout:{padding:4}}
+    data:{labels:["Carb","Prot","Fat"],datasets:[{data:[day.cb,day.p,day.f],backgroundColor:["#3b82f6","#16a34a","#dc2626"],borderColor:"#f9fafb",borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:"65%",plugins:{legend:{position:"bottom"}}}
   });
+
+  // Media ultimi 7 giorni
+  const last7 = allDays.slice(-7);
+  if(last7.length>0){
+    const avg = last7.reduce((a,d)=>a+d.items.reduce((s,i)=>s+i.nutrienti.cal,0),0)/last7.length;
+    document.getElementById("media7gg").textContent=`Media ultimi 7 giorni: ${avg.toFixed(0)} kcal`;
+  }
+
   return day;
 }
 
-// --- Salvataggio ---
+// --- Salvataggio giorno ---
 async function saveDay(){
   const date=document.getElementById("giorno").value;
   if(!date) return alert("Seleziona una data");
@@ -248,55 +270,59 @@ async function saveDay(){
     const f=db.find(x=>x.alimento===a);
     if(a&&q&&f) items.push({pasto:n,alimento:a,quantita:q,nutrienti:{cal:f.calorie*q/100,carb:f.carboidrati*q/100,prot:f.proteine*q/100,fat:f.grassi*q/100}});
   }));
-  await apiFetch("saveDay",{date,items});
-  alert("Giorno salvato per "+currentUser);
+  const res = await apiFetch("saveDay",{date,items});
+  if(res.success){alert("Giorno salvato!"); loadDay();}
+  else alert(res.msg||"Errore salvataggio");
 }
 
-// --- Caricamento giorno ---
+// --- Carica giorno selezionato ---
 async function loadDay(){
   const date=document.getElementById("giorno").value;
-  if(!date) return;
+  if(!date) return alert("Seleziona una data");
   const d=await apiFetch("getDay",{date});
-  showDay(d);
-}
-function showDay(d){
   renderMeals();
   d.forEach(i=>addRow(i.pasto,i,i.quantita));
   calc();
 }
 
-// --- Report storico ---
-const chartEl=document.getElementById("chart");
+// --- Report settimanale ---
 async function report(){
-  const from=document.getElementById("from").value;
-  const to=document.getElementById("to").value;
-  const kmin=document.getElementById("kmin").value!==""?+document.getElementById("kmin").value:null;
-  const kmax=document.getElementById("kmax").value!==""?+document.getElementById("kmax").value:null;
-  const d=await apiFetch("getAllDays");
-  allDays=d||[];
-  const labels=[],K=[],CB=[],P=[],F=[];
-  const list=document.getElementById("reportList"); list.innerHTML="";
-  allDays.forEach(x=>{
-    const items=Array.isArray(x.items)?x.items:[];
-    if(from&&x.date<from) return;
-    if(to&&x.date>to) return;
-    const t=items.reduce((a,i)=>{a.c+=i.nutrienti.cal;a.cb+=i.nutrienti.carb;a.p+=i.nutrienti.prot;a.f+=i.nutrienti.fat;return a;},{c:0,cb:0,p:0,f:0});
-    if(kmin!==null&&t.c<kmin) return;
-    if(kmax!==null&&t.c>kmax) return;
-    labels.push(x.date); K.push(t.c); CB.push(t.cb); P.push(t.p); F.push(t.f);
-    list.innerHTML+=`<span class="report-day" onclick="openDay('${x.date}')">${x.date} → ${t.c.toFixed(0)} kcal</span>`;
-  });
-  if(chart) chart.destroy();
-  chart=new Chart(chartEl,{type:"bar",data:{labels,datasets:[
-    {label:"Kcal",data:K,backgroundColor:"rgba(249,115,22,0.7)",borderColor:"rgba(194,65,12,1)",borderWidth:1,yAxisID:"yKcal"},
-    {label:"Carb (g)",data:CB,backgroundColor:"rgba(56,189,248,0.6)",borderColor:"rgba(59,130,246,1)",borderWidth:1,yAxisID:"yMacro"},
-    {label:"Prot (g)",data:P,backgroundColor:"rgba(34,197,94,0.6)",borderColor:"rgba(22,163,74,1)",borderWidth:1,yAxisID:"yMacro"},
-    {label:"Fat (g)",data:F,backgroundColor:"rgba(248,113,113,0.6)",borderColor:"rgba(220,38,38,1)",borderWidth:1,yAxisID:"yMacro"}
-  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{color:"#0f172a"}}},scales:{x:{ticks:{color:"#475569"}},yKcal:{type:"linear",position:"left",ticks:{color:"#0f172a"},title:{display:true,text:"Kcal",color:"#0f172a"}},yMacro:{type:"linear",position:"right",grid:{drawOnChartArea:false},ticks:{color:"#475569"},title:{display:true,text:"g",color:"#475569"}}}}});
-}
-function openDay(d){const day=allDays.find(x=>x.date===d);if(!day)return;document.getElementById("giorno").value=d;showDay(day.items);}
+  const d = await apiFetch("getAllDays");
+  allDays = d || [];
 
-// --- Aggiungi alimento ---
+  // Ordina le date in ordine cronologico crescente
+  allDays.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const labels = [], K = [];
+  const list = document.getElementById("reportList"); 
+  list.innerHTML = "";
+
+  allDays.forEach(x => {
+    const items = Array.isArray(x.items) ? x.items : [];
+    const t = items.reduce((a, i) => a + i.nutrienti.cal, 0);
+    labels.push(x.date);
+    K.push(t);
+    list.innerHTML += `<span class="report-day" onclick="document.getElementById('giorno').value='${x.date}';loadDay()">${x.date} → ${t.toFixed(0)} kcal</span>`;
+  });
+
+  if(chart) chart.destroy();
+  chart = new Chart(document.getElementById("chart"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Kcal",
+        data: K,
+        borderColor: "#3b82f6",
+        backgroundColor: "rgba(59,130,246,0.3)",
+        tension: 0.2,
+        fill: true
+      }]
+    }
+  });  
+}
+
+// --- Aggiungi alimento DB ---
 async function addFoodDB(){
   const a=document.getElementById("newAlimento").value.trim();
   const c=+document.getElementById("newCal").value;
@@ -304,15 +330,11 @@ async function addFoodDB(){
   const p=+document.getElementById("newProt").value;
   const f=+document.getElementById("newFat").value;
   if(!a||!c) return alert("Nome e Kcal obbligatori");
+  if(db.find(x=>x.alimento.toLowerCase()===a.toLowerCase())) return alert("Alimento già presente nel DB");
   const newFood={alimento:a,calorie:c,carboidrati:cb||0,proteine:p||0,grassi:f||0};
-  db.push(newFood);
-  await apiFetch("addFood",newFood);
-  alert("Alimento aggiunto");
-  document.getElementById("newAlimento").value="";
-  document.getElementById("newCal").value="";
-  document.getElementById("newCarb").value="";
-  document.getElementById("newProt").value="";
-  document.getElementById("newFat").value="";
+  const res = await apiFetch("addFood",newFood);
+  if(res.success){db.push(newFood); alert("Alimento aggiunto!"); hideModal(); init();}
+  else alert(res.msg||"Errore");
 }
 </script>
 </body>
