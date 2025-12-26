@@ -8,9 +8,9 @@
 <style>
 body{font-family:Inter,system-ui;background:#f9fafb;margin:0;padding:14px;color:#1f2937}
 .container{max-width:1100px;margin:auto}
-.card{background:#ffffff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.card{background:#fff;border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 3px 8px rgba(0,0,0,.07)}
 .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-input,button{padding:7px 10px;border-radius:10px;border:1px solid #cbd5e1}
+input,button{padding:6px 10px;border-radius:8px;border:1px solid #cbd5e1}
 button{cursor:pointer;font-weight:600}
 .primary{background:#3b82f6;color:#fff;border:none}
 .success{color:#16a34a;font-weight:700}
@@ -32,38 +32,41 @@ tfoot th{background:#f3f4f6}
 .report-day{cursor:pointer;color:#1f2937;font-weight:600;display:block;margin:2px 0;font-size:0.85rem}
 .small{font-size:.75rem;color:#475569}
 .macro-wrapper{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
-.macro-text{font-size:0.85rem}
-.macro-canvas-wrap{flex:0 0 140px;height:120px;position:relative}
+.macro-text{font-size:0.9rem;word-break:break-word;}
+.macro-canvas-wrap{flex:1 1 130px;height:130px;position:relative;min-width:120px}
 #macroChart{width:100%!important;height:100%!important}
 .modal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);display:none;justify-content:center;align-items:center;z-index:2000}
-.modal{background:#fff;padding:20px;border-radius:12px;width:320px;max-width:90%}
+.modal{background:#fff;padding:18px;border-radius:12px;width:320px;max-width:90%}
 .modal h3{margin-top:0;margin-bottom:10px;font-size:1.1rem}
 .modal input{width:100%;margin-bottom:6px}
 .modal button{width:100%;margin-top:6px}
+
+/* Mobile Responsive */
+@media (max-width:600px){
+  .macro-wrapper{flex-direction:column;align-items:flex-start}
+  .macro-canvas-wrap{width:100%;height:180px;flex:unset}
+  .macro-text{margin-bottom:8px}
+}
 </style>
 </head>
 <body>
 
 <div class="container">
 
-<!-- LOGIN -->
 <div class="card controls" id="loginCard">
   <input type="text" id="username" placeholder="Inserisci il tuo nome">
   <button class="primary" onclick="login()">Login</button>
 </div>
 
-<!-- APP PRINCIPALE -->
 <div id="mainApp" style="display:none;">
 
 <h1>🥗 Diario Alimentare - <span id="userLabel"></span></h1>
 
-<!-- Aggiungi Alimento -->
 <div class="card controls">
   <button class="primary" onclick="showModal()">➕ Aggiungi Alimento al DB</button>
   <button class="primary" onclick="init()">🔄 Aggiorna Dati</button>
 </div>
 
-<!-- Controlli giorno -->
 <div class="card controls">
   <input type="date" id="giorno">
   <button class="primary" onclick="loadDay()">Carica</button>
@@ -72,13 +75,10 @@ tfoot th{background:#f3f4f6}
   <span class="small">Auto-calcolo kcal e macro</span>
 </div>
 
-<!-- Pasti -->
 <div id="meals"></div>
 
-<!-- Totale giorno compatto -->
-<div class="card" style="padding:10px;">
+<div class="card" style="padding:8px;">
   <div class="macro-wrapper">
-    <b style="font-size:1rem;">Totale Giorno</b>
     <div id="totDay" class="macro-text">—</div>
     <div class="macro-canvas-wrap">
       <canvas id="macroChart"></canvas>
@@ -87,16 +87,14 @@ tfoot th{background:#f3f4f6}
   <div class="small" id="media7gg">Media ultimi 7 giorni: — kcal</div>
 </div>
 
-<!-- Report compatto -->
 <div class="card">
   <h3>📊 Report Settimanale</h3>
-  <canvas id="chart" style="height:180px;"></canvas>
+  <canvas id="chart" style="height:200px;"></canvas>
   <div id="reportList"></div>
 </div>
 
 </div>
 
-<!-- Modal Aggiungi Alimento -->
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <h3>➕ Aggiungi Alimento</h3>
@@ -112,17 +110,10 @@ tfoot th{background:#f3f4f6}
 
 <script>
 const API = "https://script.google.com/macros/s/AKfycbw9w8nsZFZ-bPgrEAKgOvhG6hKu3ECinJWH707kLnCMXJDT5UYfg1n99eb37umYcn3Xsw/exec";
-const MEALS = [
-  ["Colazione","colazione"],
-  ["Spuntino mattina","spuntino-m"],
-  ["Pranzo","pranzo"],
-  ["Spuntino pomeriggio","spuntino-p"],
-  ["Cena","cena"]
-];
+const MEALS = [["Colazione","colazione"],["Spuntino mattina","spuntino-m"],["Pranzo","pranzo"],["Spuntino pomeriggio","spuntino-p"],["Cena","cena"]];
 let db=[], allDays=[], chart, macroChart;
 let currentUser="";
 
-// --- Login ---
 function login(){
   const name = document.getElementById("username").value.trim();
   if(!name) return alert("Inserisci il tuo nome!");
@@ -133,11 +124,9 @@ function login(){
   init();
 }
 
-// --- Modal ---
 function showModal(){document.getElementById("modalBg").style.display="flex";}
 function hideModal(){document.getElementById("modalBg").style.display="none";}
 
-// --- API ---
 async function apiFetch(action, body=null){
   const url = `${API}?action=${action}&user=${encodeURIComponent(currentUser)}`;
   const options = body? {method:"POST",body:JSON.stringify(body)}:{};
@@ -145,23 +134,18 @@ async function apiFetch(action, body=null){
   return await res.json();
 }
 
-// --- Init / Aggiorna ---
 async function init(){
   db = await apiFetch("getDB");
   renderMeals();
   report();
 }
 
-// --- Render pasti ---
 function renderMeals(){
   const m=document.getElementById("meals"); m.innerHTML="";
   MEALS.forEach(([n,c])=>{
     m.innerHTML+=`
     <div class="card">
-      <div class="meal-title ${c}">
-        <span>${n}</span>
-        <button type="button" onclick="addRow('${n}')">+</button>
-      </div>
+      <div class="meal-title ${c}"><span>${n}</span><button type="button" onclick="addRow('${n}')">+</button></div>
       <table>
         <thead><tr><th>Alimento</th><th>g</th><th>Kcal</th><th>Carb</th><th>Prot</th><th>Fat</th><th></th></tr></thead>
         <tbody id="${n}-b"></tbody>
@@ -181,24 +165,16 @@ function renderMeals(){
   });
 }
 
-// --- Aggiungi riga ---
 function addRow(m,a={},q=100){
   const b=document.getElementById(m+"-b");
   const r=document.createElement("tr");
-  r.innerHTML=`<td style="position:relative">
-<input value="${a.alimento||''}" oninput="auto(this)">
-<div class="autocomplete"></div>
-</td>
-<td><input type="number" value="${q}" onchange="calc()"></td>
-<td class="c">0</td>
-<td class="cb">0</td>
-<td class="p">0</td>
-<td class="f">0</td>
-<td><button type="button" onclick="this.closest('tr').remove();calc()">✕</button></td>`;
+  r.innerHTML=`<td style="position:relative"><input value="${a.alimento||''}" oninput="auto(this)"><div class="autocomplete"></div></td>
+  <td><input type="number" value="${q}" onchange="calc()"></td>
+  <td class="c">0</td><td class="cb">0</td><td class="p">0</td><td class="f">0</td>
+  <td><button type="button" onclick="this.closest('tr').remove();calc()">✕</button></td>`;
   b.appendChild(r);
 }
 
-// --- Autocomplete ---
 function auto(i){
   const box=i.nextElementSibling;
   const v=i.value.toLowerCase();
@@ -216,7 +192,6 @@ document.addEventListener("click",e=>{
     document.querySelectorAll(".autocomplete").forEach(d=>d.style.display="none");
 });
 
-// --- Calcolo nutrienti e totale ---
 function calc(){
   let day={c:0,cb:0,p:0,f:0};
   MEALS.forEach(([n])=>{
@@ -236,6 +211,7 @@ function calc(){
     ["c","cb","p","f"].forEach(k=>document.getElementById(`${n}-${k}`).textContent=t[k].toFixed(1));
     day.c+=t.c; day.cb+=t.cb; day.p+=t.p; day.f+=t.f;
   });
+
   const kTarget = +document.getElementById("kTarget").value||0;
   const totEl = document.getElementById("totDay");
   totEl.innerHTML=`🔥 ${day.c.toFixed(0)} kcal · 🥖 ${day.cb.toFixed(1)} g · 💪 ${day.p.toFixed(1)} g · 🧈 ${day.f.toFixed(1)} g`;
@@ -246,10 +222,9 @@ function calc(){
   macroChart=new Chart(ctx,{
     type:"doughnut",
     data:{labels:["Carb","Prot","Fat"],datasets:[{data:[day.cb,day.p,day.f],backgroundColor:["#3b82f6","#16a34a","#dc2626"],borderColor:"#f9fafb",borderWidth:2}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:"65%",plugins:{legend:{position:"bottom"}}}
+    options:{responsive:true,maintainAspectRatio:false,cutout:"55%",plugins:{legend:{display:true,position:"bottom",labels:{font:{size:12}}},tooltip:{callbacks:{label:ctx=>ctx.label+": "+ctx.raw.toFixed(1)+" g"}}}}
   });
 
-  // Media ultimi 7 giorni
   const last7 = allDays.slice(-7);
   if(last7.length>0){
     const avg = last7.reduce((a,d)=>a+d.items.reduce((s,i)=>s+i.nutrienti.cal,0),0)/last7.length;
@@ -259,7 +234,6 @@ function calc(){
   return day;
 }
 
-// --- Salvataggio giorno ---
 async function saveDay(){
   const date=document.getElementById("giorno").value;
   if(!date) return alert("Seleziona una data");
@@ -275,7 +249,6 @@ async function saveDay(){
   else alert(res.msg||"Errore salvataggio");
 }
 
-// --- Carica giorno selezionato ---
 async function loadDay(){
   const date=document.getElementById("giorno").value;
   if(!date) return alert("Seleziona una data");
@@ -285,24 +258,25 @@ async function loadDay(){
   calc();
 }
 
-// --- Report settimanale ---
 async function report(){
   const d = await apiFetch("getAllDays");
   allDays = d || [];
+  allDays.sort((a,b)=>new Date(a.date)-new Date(b.date));
 
-  // Ordina le date in ordine cronologico crescente
-  allDays.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  const labels = [], K = [];
+  const labels = [], K=[], CB=[], P=[], F=[];
   const list = document.getElementById("reportList"); 
   list.innerHTML = "";
 
-  allDays.forEach(x => {
+  allDays.forEach(x=>{
     const items = Array.isArray(x.items) ? x.items : [];
-    const t = items.reduce((a, i) => a + i.nutrienti.cal, 0);
-    labels.push(x.date);
-    K.push(t);
-    list.innerHTML += `<span class="report-day" onclick="document.getElementById('giorno').value='${x.date}';loadDay()">${x.date} → ${t.toFixed(0)} kcal</span>`;
+    const t = items.reduce((a,i)=>{
+      a.cal+=i.nutrienti.cal; a.cb+=i.nutrienti.carb; a.p+=i.nutrienti.prot; a.f+=i.nutrienti.fat;
+      return a;
+    },{cal:0,cb:0,p:0,f:0});
+    labels.push(x.date); K.push(t.cal); CB.push(t.cb); P.push(t.p); F.push(t.f);
+    list.innerHTML += `<span class="report-day" onclick="document.getElementById('giorno').value='${x.date}';loadDay()">
+      ${x.date} → 🔥${t.cal.toFixed(0)} kcal · 🥖${t.cb.toFixed(1)} g · 💪${t.p.toFixed(1)} g · 🧈${t.f.toFixed(1)} g
+    </span>`;
   });
 
   if(chart) chart.destroy();
@@ -310,19 +284,17 @@ async function report(){
     type: "line",
     data: {
       labels,
-      datasets: [{
-        label: "Kcal",
-        data: K,
-        borderColor: "#3b82f6",
-        backgroundColor: "rgba(59,130,246,0.3)",
-        tension: 0.2,
-        fill: true
-      }]
-    }
-  });  
+      datasets: [
+        {label:"Kcal", data:K, borderColor:"#f59e0b", backgroundColor:"rgba(245,158,11,0.3)", tension:0.2, fill:true},
+        {label:"Carb", data:CB, borderColor:"#3b82f6", backgroundColor:"rgba(59,130,246,0.3)", tension:0.2, fill:true},
+        {label:"Prot", data:P, borderColor:"#16a34a", backgroundColor:"rgba(22,163,52,0.3)", tension:0.2, fill:true},
+        {label:"Fat", data:F, borderColor:"#dc2626", backgroundColor:"rgba(220,38,38,0.3)", tension:0.2, fill:true}
+      ]
+    },
+    options:{responsive:true,plugins:{legend:{position:"bottom"}}}
+  });
 }
 
-// --- Aggiungi alimento DB ---
 async function addFoodDB(){
   const a=document.getElementById("newAlimento").value.trim();
   const c=+document.getElementById("newCal").value;
@@ -339,4 +311,3 @@ async function addFoodDB(){
 </script>
 </body>
 </html>
-
