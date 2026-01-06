@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>🥗 Diario Alimentare</title>
+<title>🥗 Diario Alimentare Completo</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 body{font-family:Inter,system-ui;background:#f9fafb;margin:0;padding:14px;color:#1f2937}
@@ -17,12 +17,7 @@ button{cursor:pointer;font-weight:600}
 .warning{color:#dc2626;font-weight:700}
 .meal-title{font-weight:700;padding:6px;border-radius:12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
 .meal-title button{font-size:0.8rem;padding:4px 8px}
-.colazione{background:#fefce8}
-.spuntino-m{background:#d1fae5}
-.pranzo{background:#dbeafe}
-.spuntino-p{background:#ede9fe}
-.cena{background:#fee2e2}
-table{width:100%;border-collapse:collapse;font-size:.85rem}
+table{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:6px}
 th,td{padding:6px;text-align:center;border-bottom:1px solid #e5e7eb}
 thead th{background:#1f2937;color:#fff}
 tfoot th{background:#f3f4f6}
@@ -35,13 +30,21 @@ tfoot th{background:#f3f4f6}
 .macro-text{font-size:0.9rem;word-break:break-word;}
 .macro-canvas-wrap{flex:1 1 130px;height:130px;position:relative;min-width:120px}
 #macroChart{width:100%!important;height:100%!important}
-.modal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);display:none;justify-content:center;align-items:center;z-index:2000}
-.modal{background:#fff;padding:18px;border-radius:12px;width:320px;max-width:90%}
-.modal h3{margin-top:0;margin-bottom:10px;font-size:1.1rem}
-.modal input{width:100%;margin-bottom:6px}
-.modal button{width:100%;margin-top:6px}
-
-/* Mobile Responsive */
+.modal-bg,.modal-bg-target{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);display:none;justify-content:center;align-items:center;z-index:2000}
+.modal,.modal-target{background:#fff;padding:18px;border-radius:12px;width:320px;max-width:90%}
+.modal h3,.modal-target h3{margin-top:0;margin-bottom:10px;font-size:1.1rem}
+.modal input,.modal-target input{width:100%;margin-bottom:6px}
+.modal button,.modal-target button{width:100%;margin-top:6px}
+.table-target{width:100%;border-collapse:collapse;margin-top:10px}
+.table-target th,.table-target td{border:1px solid #e5e7eb;padding:6px;text-align:center;font-size:0.85rem}
+.table-target th{background:#1f2937;color:#fff}
+.diff-positive{color:#dc2626;font-weight:700} /* superato target */
+.diff-negative{color:#16a34a;font-weight:700} /* sotto target */
+.meal-colazione{background:#e0f2fe}
+.meal-spuntino-m{background:#fef3c7}
+.meal-pranzo{background:#d1fae5}
+.meal-spuntino-p{background:#fee2e2}
+.meal-cena{background:#ede9fe}
 @media (max-width:600px){
   .macro-wrapper{flex-direction:column;align-items:flex-start}
   .macro-canvas-wrap{width:100%;height:180px;flex:unset}
@@ -50,29 +53,27 @@ tfoot th{background:#f3f4f6}
 </style>
 </head>
 <body>
-
 <div class="container">
 
+<!-- LOGIN -->
 <div class="card controls" id="loginCard">
   <input type="text" id="username" placeholder="Inserisci il tuo nome">
-  <button class="primary" onclick="login()">Login</button>
+  <button class="primary" id="loginBtn">Login</button>
 </div>
 
 <div id="mainApp" style="display:none;">
-
 <h1>🥗 Diario Alimentare - <span id="userLabel"></span></h1>
 
 <div class="card controls">
-  <button class="primary" onclick="showModal()">➕ Aggiungi Alimento al DB</button>
-  <button class="primary" onclick="init()">🔄 Aggiorna Dati</button>
+  <button class="primary" onclick="showModal()">➕ Aggiungi Alimento</button>
+  <button class="primary" onclick="init(true)">🔄 Aggiorna Dati</button>
+  <button class="primary" onclick="showTargetModal()">🎯 Piano Settimanale</button>
 </div>
 
 <div class="card controls">
   <input type="date" id="giorno">
   <button class="primary" onclick="loadDay()">Carica</button>
-  <button onclick="saveDay()">Salva</button>
-  <input type="number" id="kTarget" placeholder="Target Kcal" style="width:100px">
-  <span class="small">Auto-calcolo kcal e macro</span>
+  <button class="primary" onclick="saveDay()">Salva</button>
 </div>
 
 <div id="meals"></div>
@@ -84,17 +85,37 @@ tfoot th{background:#f3f4f6}
       <canvas id="macroChart"></canvas>
     </div>
   </div>
-  <div class="small" id="media7gg">Media ultimi 7 giorni: — kcal</div>
 </div>
 
 <div class="card">
   <h3>📊 Report Settimanale</h3>
+  <div class="controls week-nav" style="margin-bottom:6px;">
+    <button class="primary" onclick="changeWeek(-1)">⬅ Settimana Precedente</button>
+    <span id="weekLabel" style="margin:0 10px;font-weight:600;"></span>
+    <button class="primary" onclick="changeWeek(1)">Settimana Successiva ➡</button>
+  </div>
   <canvas id="chart" style="height:200px;"></canvas>
   <div id="reportList"></div>
 </div>
 
+<div class="card">
+  <h3>🎯 Confronto Pasti vs Target Settimanale</h3>
+  <table class="table-target" id="targetCompareTable">
+    <thead>
+      <tr>
+        <th>Giorno</th>
+        <th>Data</th>
+        <th>Kcal</th>
+        <th>Carb</th>
+        <th>Prot</th>
+        <th>Fat</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 </div>
 
+<!-- MODAL ALIMENTO -->
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <h3>➕ Aggiungi Alimento</h3>
@@ -108,44 +129,63 @@ tfoot th{background:#f3f4f6}
   </div>
 </div>
 
-<script>
-const API = "https://script.google.com/macros/s/AKfycbw9w8nsZFZ-bPgrEAKgOvhG6hKu3ECinJWH707kLnCMXJDT5UYfg1n99eb37umYcn3Xsw/exec";
-const MEALS = [["Colazione","colazione"],["Spuntino mattina","spuntino-m"],["Pranzo","pranzo"],["Spuntino pomeriggio","spuntino-p"],["Cena","cena"]];
-let db=[], allDays=[], chart, macroChart;
-let currentUser="";
+<!-- MODAL TARGET -->
+<div class="modal-bg-target" id="targetModalBg">
+  <div class="modal-target">
+    <h3>🎯 Piano Settimanale</h3>
+    <table class="table-target">
+      <thead><tr><th>Giorno</th><th>Kcal</th><th>Carb</th><th>Prot</th><th>Fat</th></tr></thead>
+      <tbody id="targetModalBody"></tbody>
+    </table>
+    <button class="primary" onclick="saveWeeklyTargets()">💾 Salva Piano</button>
+    <button onclick="hideTargetModal()">Chiudi</button>
+  </div>
+</div>
 
-function login(){
-  const name = document.getElementById("username").value.trim();
-  if(!name) return alert("Inserisci il tuo nome!");
-  currentUser = name;
-  document.getElementById("userLabel").textContent = currentUser;
-  document.getElementById("loginCard").style.display = "none";
-  document.getElementById("mainApp").style.display = "block";
-  init();
-}
+<script>
+let currentUser="", db=[], allDays=[], targets=[], chart, macroChart;
+const MEALS=[["Colazione","colazione"],["Spuntino mattina","spuntino-m"],["Pranzo","pranzo"],["Spuntino pomeriggio","spuntino-p"],["Cena","cena"]];
+const PASTO_COLORS={"Colazione":"meal-colazione","Spuntino mattina":"meal-spuntino-m","Pranzo":"meal-pranzo","Spuntino pomeriggio":"meal-spuntino-p","Cena":"meal-cena"};
+let currentWeekMonday=new Date(); currentWeekMonday.setDate(currentWeekMonday.getDate()-(currentWeekMonday.getDay()||7)+1);
+
+document.getElementById("loginBtn").addEventListener("click",async ()=>{
+  currentUser=document.getElementById("username").value.trim();
+  if(!currentUser){alert("Inserisci nome"); return;}
+  document.getElementById("loginCard").style.display="none";
+  document.getElementById("mainApp").style.display="block";
+  document.getElementById("userLabel").textContent=currentUser;
+  await init();
+});
 
 function showModal(){document.getElementById("modalBg").style.display="flex";}
 function hideModal(){document.getElementById("modalBg").style.display="none";}
+function showTargetModal(){renderTargetModal(); document.getElementById("targetModalBg").style.display="flex";}
+function hideTargetModal(){document.getElementById("targetModalBg").style.display="none";}
 
-async function apiFetch(action, body=null){
-  const url = `${API}?action=${action}&user=${encodeURIComponent(currentUser)}`;
-  const options = body? {method:"POST",body:JSON.stringify(body)}:{};
-  const res = await fetch(url, options);
+const API="https://script.google.com/macros/s/AKfycbyj8ph-TI2V5Q47E1TPdQECFz_YYl6n-eAHvVv8fHUuYKqgUrLraa9HdsEeZVOZ_pY4/exec";
+async function apiFetch(action,body=null){
+  const url=`${API}?action=${action}&user=${encodeURIComponent(currentUser)}`;
+  const options=body?{method:"POST",body:JSON.stringify(body)}:{};
+  const res=await fetch(url,options);
   return await res.json();
 }
 
-async function init(){
-  db = await apiFetch("getDB");
-  renderMeals();
-  report();
+// --- INIT ---
+async function init(keepCurrent=false){
+  db=await apiFetch("getDB") || [];
+  targets=await apiFetch("getTargets") || [];
+  if(!keepCurrent) renderMeals();
+  await report();
+  renderTargetCompare();
 }
 
+// --- RENDER MEALS ---
 function renderMeals(){
   const m=document.getElementById("meals"); m.innerHTML="";
   MEALS.forEach(([n,c])=>{
     m.innerHTML+=`
-    <div class="card">
-      <div class="meal-title ${c}"><span>${n}</span><button type="button" onclick="addRow('${n}')">+</button></div>
+    <div class="card ${PASTO_COLORS[n]}">
+      <div class="meal-title"><span>${n}</span><button type="button" onclick="addRow('${n}')">+</button></div>
       <table>
         <thead><tr><th>Alimento</th><th>g</th><th>Kcal</th><th>Carb</th><th>Prot</th><th>Fat</th><th></th></tr></thead>
         <tbody id="${n}-b"></tbody>
@@ -169,29 +209,26 @@ function addRow(m,a={},q=100){
   const b=document.getElementById(m+"-b");
   const r=document.createElement("tr");
   r.innerHTML=`<td style="position:relative"><input value="${a.alimento||''}" oninput="auto(this)"><div class="autocomplete"></div></td>
-  <td><input type="number" value="${q}" onchange="calc()"></td>
+  <td><input type="number" value="${q}" onchange="calc();renderTargetCompare();"></td>
   <td class="c">0</td><td class="cb">0</td><td class="p">0</td><td class="f">0</td>
-  <td><button type="button" onclick="this.closest('tr').remove();calc()">✕</button></td>`;
+  <td><button type="button" onclick="this.closest('tr').remove();calc();renderTargetCompare();">✕</button></td>`;
   b.appendChild(r);
 }
 
+// --- AUTOCOMPLETE ---
 function auto(i){
-  const box=i.nextElementSibling;
-  const v=i.value.toLowerCase();
-  box.innerHTML="";
-  if(!v){box.style.display="none";return;}
+  const box=i.nextElementSibling; const v=i.value.toLowerCase();
+  box.innerHTML=""; if(!v){box.style.display="none";return;}
   db.filter(x=>x.alimento.toLowerCase().includes(v)).slice(0,20).forEach(a=>{
     const d=document.createElement("div"); d.textContent=a.alimento;
-    d.onclick=()=>{i.value=a.alimento;box.style.display="none";calc();};
+    d.onclick=()=>{i.value=a.alimento;box.style.display="none";calc();renderTargetCompare();};
     box.appendChild(d);
   });
   box.style.display="block";
 }
-document.addEventListener("click",e=>{
-  if(!e.target.closest(".autocomplete") && !e.target.closest("td"))
-    document.querySelectorAll(".autocomplete").forEach(d=>d.style.display="none");
-});
+document.addEventListener("click",e=>{if(!e.target.closest(".autocomplete")&&!e.target.closest("td")) document.querySelectorAll(".autocomplete").forEach(d=>d.style.display="none");});
 
+// --- CALC MACRO ---
 function calc(){
   let day={c:0,cb:0,p:0,f:0};
   MEALS.forEach(([n])=>{
@@ -212,39 +249,30 @@ function calc(){
     day.c+=t.c; day.cb+=t.cb; day.p+=t.p; day.f+=t.f;
   });
 
-  const kTarget = +document.getElementById("kTarget").value||0;
   const totEl = document.getElementById("totDay");
   totEl.innerHTML=`🔥 ${day.c.toFixed(0)} kcal · 🥖 ${day.cb.toFixed(1)} g · 💪 ${day.p.toFixed(1)} g · 🧈 ${day.f.toFixed(1)} g`;
-  totEl.className = day.c>kTarget && kTarget>0 ? "warning" : "success";
 
-  const ctx=document.getElementById("macroChart");
   if(macroChart) macroChart.destroy();
-  macroChart=new Chart(ctx,{
+  macroChart=new Chart(document.getElementById("macroChart"),{
     type:"doughnut",
     data:{labels:["Carb","Prot","Fat"],datasets:[{data:[day.cb,day.p,day.f],backgroundColor:["#3b82f6","#16a34a","#dc2626"],borderColor:"#f9fafb",borderWidth:2}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:"55%",plugins:{legend:{display:true,position:"bottom",labels:{font:{size:12}}},tooltip:{callbacks:{label:ctx=>ctx.label+": "+ctx.raw.toFixed(1)+" g"}}}}
   });
 
-  const last7 = allDays.slice(-7);
-  if(last7.length>0){
-    const avg = last7.reduce((a,d)=>a+d.items.reduce((s,i)=>s+i.nutrienti.cal,0),0)/last7.length;
-    document.getElementById("media7gg").textContent=`Media ultimi 7 giorni: ${avg.toFixed(0)} kcal`;
-  }
-
   return day;
 }
 
+// --- SAVE / LOAD ---
 async function saveDay(){
   const date=document.getElementById("giorno").value;
   if(!date) return alert("Seleziona una data");
   const items=[];
   MEALS.forEach(([n])=>[...document.getElementById(n+"-b").rows].forEach(r=>{
-    const a=r.cells[0].children[0].value;
-    const q=+r.cells[1].children[0].value||0;
+    const a=r.cells[0].children[0].value; const q=+r.cells[1].children[0].value||0;
     const f=db.find(x=>x.alimento===a);
     if(a&&q&&f) items.push({pasto:n,alimento:a,quantita:q,nutrienti:{cal:f.calorie*q/100,carb:f.carboidrati*q/100,prot:f.proteine*q/100,fat:f.grassi*q/100}});
   }));
-  const res = await apiFetch("saveDay",{date,items});
+  const res=await apiFetch("saveDay",{date,items});
   if(res.success){alert("Giorno salvato!"); loadDay();}
   else alert(res.msg||"Errore salvataggio");
 }
@@ -252,62 +280,125 @@ async function saveDay(){
 async function loadDay(){
   const date=document.getElementById("giorno").value;
   if(!date) return alert("Seleziona una data");
-  const d=await apiFetch("getDay",{date});
+  const d=await apiFetch("getDay",{date}) || [];
   renderMeals();
   d.forEach(i=>addRow(i.pasto,i,i.quantita));
   calc();
 }
 
+// --- REPORT SETTIMANALE ---
+function getMonday(d){d=new Date(d);const day=d.getDay();d.setDate(d.getDate()-(day||7)+1);return d;}
+function formatDate(d){return new Date(d).toISOString().split('T')[0];}
+function changeWeek(offset){
+  currentWeekMonday.setDate(currentWeekMonday.getDate()+offset*7);
+  report();
+}
+
 async function report(){
-  const d = await apiFetch("getAllDays");
-  allDays = d || [];
+  const d=await apiFetch("getAllDays") || [];
+  allDays=d;
   allDays.sort((a,b)=>new Date(a.date)-new Date(b.date));
 
-  const labels = [], K=[], CB=[], P=[], F=[];
-  const list = document.getElementById("reportList"); 
-  list.innerHTML = "";
+  const labels=[], K=[], CB=[], P=[], F=[];
+  const list=document.getElementById("reportList"); list.innerHTML="";
 
-  allDays.forEach(x=>{
-    const items = Array.isArray(x.items) ? x.items : [];
-    const t = items.reduce((a,i)=>{
-      a.cal+=i.nutrienti.cal; a.cb+=i.nutrienti.carb; a.p+=i.nutrienti.prot; a.f+=i.nutrienti.fat;
-      return a;
-    },{cal:0,cb:0,p:0,f:0});
-    labels.push(x.date); K.push(t.cal); CB.push(t.cb); P.push(t.p); F.push(t.f);
-    list.innerHTML += `<span class="report-day" onclick="document.getElementById('giorno').value='${x.date}';loadDay()">
-      ${x.date} → 🔥${t.cal.toFixed(0)} kcal · 🥖${t.cb.toFixed(1)} g · 💪${t.p.toFixed(1)} g · 🧈${t.f.toFixed(1)} g
-    </span>`;
-  });
+  const weekStart=currentWeekMonday;
+  const weekEnd=new Date(weekStart); weekEnd
+.setDate(weekEnd.getDate()+6);
+document.getElementById("weekLabel").textContent=`${weekStart.toLocaleDateString()} - ${weekEnd.toLocaleDateString()}`;
 
-  if(chart) chart.destroy();
-  chart = new Chart(document.getElementById("chart"), {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        {label:"Kcal", data:K, borderColor:"#f59e0b", backgroundColor:"rgba(245,158,11,0.3)", tension:0.2, fill:true},
-        {label:"Carb", data:CB, borderColor:"#3b82f6", backgroundColor:"rgba(59,130,246,0.3)", tension:0.2, fill:true},
-        {label:"Prot", data:P, borderColor:"#16a34a", backgroundColor:"rgba(22,163,52,0.3)", tension:0.2, fill:true},
-        {label:"Fat", data:F, borderColor:"#dc2626", backgroundColor:"rgba(220,38,38,0.3)", tension:0.2, fill:true}
-      ]
-    },
-    options:{responsive:true,plugins:{legend:{position:"bottom"}}}
+const days=["Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato","Domenica"];
+days.forEach((day,i)=>{
+  const dateObj=new Date(weekStart);
+  dateObj.setDate(dateObj.getDate()+i);
+  const dateStr=formatDate(dateObj);
+  const dayData=allDays.find(x=>x.date===dateStr);
+  const t=dayData ? dayData.items.reduce((a,i)=>{a.cal+=i.nutrienti.cal;a.cb+=i.nutrienti.carb;a.p+=i.nutrienti.prot;a.f+=i.nutrienti.fat;return a;},{cal:0,cb:0,p:0,f:0}) : {cal:0,cb:0,p:0,f:0};
+  labels.push(day);
+  K.push(t.cal); CB.push(t.cb); P.push(t.p); F.push(t.f);
+  list.innerHTML+=`<span class="report-day" onclick="document.getElementById('giorno').value='${dateStr}';loadDay();">${day} (${dateStr}): 🔥${t.cal.toFixed(0)} · 🥖${t.cb.toFixed(1)} · 💪${t.p.toFixed(1)} · 🧈${t.f.toFixed(1)}</span>`;
+});
+
+// Chart settimanale
+if(chart) chart.destroy();
+chart=new Chart(document.getElementById("chart"),{
+  type:"bar",
+  data:{labels, datasets:[
+    {label:"Kcal",data:K,backgroundColor:"#3b82f6"},
+    {label:"Carb",data:CB,backgroundColor:"#f59e0b"},
+    {label:"Prot",data:P,backgroundColor:"#16a34a"},
+    {label:"Fat",data:F,backgroundColor:"#dc2626"}
+  ]},
+  options:{responsive:true,plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:ctx=>{
+    const v=ctx.raw; return ctx.dataset.label+": "+(ctx.dataset.label==="Kcal"?v.toFixed(0)+" kcal":v.toFixed(1)+" g");
+  }}}}}
+});
+
+renderTargetCompare();
+}
+
+// --- MODAL TARGET ---
+function renderTargetModal(){
+  const tbody=document.getElementById("targetModalBody"); tbody.innerHTML="";
+  const days=["Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato","Domenica"];
+  days.forEach(d=>{
+    const t=targets.find(x=>x.Giorno===d) || {Kcal:0,Carb:0,Prot:0,Fat:0};
+    tbody.innerHTML+=`<tr>
+      <td>${d}</td>
+      <td><input type="number" value="${t.Kcal}"></td>
+      <td><input type="number" value="${t.Carb}"></td>
+      <td><input type="number" value="${t.Prot}"></td>
+      <td><input type="number" value="${t.Fat}"></td>
+    </tr>`;
   });
 }
 
+async function saveWeeklyTargets(){
+  const tbody=document.getElementById("targetModalBody");
+  const rows=[...tbody.rows].map(r=>({
+    User:currentUser,
+    Giorno:r.cells[0].textContent,
+    Kcal:+r.cells[1].children[0].value||0,
+    Carb:+r.cells[2].children[0].value||0,
+    Prot:+r.cells[3].children[0].value||0,
+    Fat:+r.cells[4].children[0].value||0
+  }));
+  const res=await apiFetch("saveTargets",rows);
+  if(res.success){targets=rows;alert("Piano salvato!"); hideTargetModal(); renderTargetCompare();}
+  else alert(res.msg||"Errore salvataggio target");
+}
+
+// --- RENDER CONFRONTO TARGET ---
+function renderTargetCompare(){
+  const tbody=document.querySelector("#targetCompareTable tbody");
+  tbody.innerHTML="";
+  const days=["Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato","Domenica"];
+  days.forEach((d,i)=>{
+    const dateObj=new Date(currentWeekMonday);
+    dateObj.setDate(dateObj.getDate()+i);
+    const dateStr=formatDate(dateObj);
+    const t=targets.find(x=>x.Giorno===d) || {Kcal:0,Carb:0,Prot:0,Fat:0};
+    const dayData=allDays.find(x=>x.date===dateStr);
+    const tot=dayData?dayData.items.reduce((a,i)=>{a.cal+=i.nutrienti.cal;a.cb+=i.nutrienti.carb;a.p+=i.nutrienti.prot;a.f+=i.nutrienti.fat;return a;},{cal:0,cb:0,p:0,f:0}) : {cal:0,cb:0,p:0,f:0};
+    const row=document.createElement("tr");
+    row.innerHTML=`<td>${d}</td>
+      <td>${dateStr}</td>
+      <td class="${tot.cal>t.Kcal?'diff-positive':'diff-negative'}">${tot.cal.toFixed(0)}</td>
+      <td class="${tot.cb>t.Carb?'diff-positive':'diff-negative'}">${tot.cb.toFixed(1)}</td>
+      <td class="${tot.p>t.Prot?'diff-positive':'diff-negative'}">${tot.p.toFixed(1)}</td>
+      <td class="${tot.f>t.Fat?'diff-positive':'diff-negative'}">${tot.f.toFixed(1)}</td>`;
+    tbody.appendChild(row);
+  });
+}
+
+// --- ADD FOOD DB ---
 async function addFoodDB(){
-  const a=document.getElementById("newAlimento").value.trim();
-  const c=+document.getElementById("newCal").value;
-  const cb=+document.getElementById("newCarb").value;
-  const p=+document.getElementById("newProt").value;
-  const f=+document.getElementById("newFat").value;
-  if(!a||!c) return alert("Nome e Kcal obbligatori");
-  if(db.find(x=>x.alimento.toLowerCase()===a.toLowerCase())) return alert("Alimento già presente nel DB");
-  const newFood={alimento:a,calorie:c,carboidrati:cb||0,proteine:p||0,grassi:f||0};
-  const res = await apiFetch("addFood",newFood);
-  if(res.success){db.push(newFood); alert("Alimento aggiunto!"); hideModal(); init();}
-  else alert(res.msg||"Errore");
+  const f={alimento:document.getElementById("newAlimento").value,calorie:+document.getElementById("newCal").value||0,carboidrati:+document.getElementById("newCarb").value||0,proteine:+document.getElementById("newProt").value||0,grassi:+document.getElementById("newFat").value||0};
+  const res=await apiFetch("addFood",f);
+  if(res.success){alert("Alimento aggiunto!"); db.push(f); hideModal();}
+  else alert(res.msg||"Errore aggiunta alimento");
 }
 </script>
+</div>
 </body>
 </html>
